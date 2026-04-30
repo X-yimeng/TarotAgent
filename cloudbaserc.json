@@ -1,0 +1,18 @@
+{
+  "version": "2.0",
+  "envId": "",
+  "framework": {
+    "plugins": {
+      "client": {
+        "use": "@cloudbase/framework-plugin-next",
+        "inputs": {
+          "entry": "./",
+          "name": "tarot-agent",
+          "path": "/",
+          "buildCommand": "npm run build"
+        }
+      }
+    }
+  }
+}
+

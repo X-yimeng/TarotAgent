@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // CloudBase/Node SSR friendly build output
+  output: "standalone",
+  poweredByHeader: false,
 };
 
 export default nextConfig;
