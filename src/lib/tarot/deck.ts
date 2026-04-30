@@ -1,4 +1,5 @@
 import type { TarotCard } from "./types";
+import { createMinorArcana } from "./knowledge";
 
 export const MAJOR_ARCANA: TarotCard[] = [
   {
@@ -9,6 +10,11 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["开始", "自由", "冒险", "直觉"],
     upright: "新的旅程正在开启。带着好奇与信任迈出第一步，但记得给自己留一点安全绳。",
     reversed: "冲动或逃避责任的迹象。先把信息补齐、再决定是否要跳。",
+    archetype: "开端/冒险者",
+    light: "允许自己从‘不知道’开始，用体验换来成长。",
+    shadow: "用冲动掩盖不安，或把自由当成不负责。",
+    reflectionQuestions: ["我在害怕承担什么？", "我真正想尝试的第一步是什么？"],
+    actionAdvice: ["把风险写出来并准备一条安全绳", "先做 1 次低成本尝试再决定是否加码"],
   },
   {
     id: "the-magician",
@@ -18,6 +24,11 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["行动", "资源", "掌控", "表达"],
     upright: "你手上已经有足够资源。把想法说清楚、把计划拆小，马上就能动起来。",
     reversed: "能量分散或“说得多做得少”。聚焦一个目标，避免用话术掩盖不确定。",
+    archetype: "启动/把想法变成现实",
+    light: "把资源与语言组织起来，让事情开始发生。",
+    shadow: "用技巧替代真实行动，或把控制当成安全感。",
+    reflectionQuestions: ["我手里有什么资源被我低估了？", "我现在最该‘做’而不是‘想’的是什么？"],
+    actionAdvice: ["把目标拆成 3 步并立刻做第一步", "用一句话明确你的意图/边界"],
   },
   {
     id: "the-high-priestess",
@@ -27,6 +38,11 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["直觉", "隐秘", "等待", "洞察"],
     upright: "答案在你心里。先观察、少表态，保持边界感，你会看见更深的真相。",
     reversed: "忽视直觉或被情绪噪音淹没。把外界意见先关掉，回到自己的感觉。",
+    archetype: "直觉/内在知识",
+    light: "先听见自己，再决定要不要说。",
+    shadow: "把焦虑当直觉，或把沉默当逃避。",
+    reflectionQuestions: ["我真正知道却不敢承认的是什么？", "我需要哪些信息来验证直觉？"],
+    actionAdvice: ["先观察再表态，给自己 24 小时缓冲", "把‘感觉’写下来并找证据核对"],
   },
   {
     id: "the-empress",
@@ -36,6 +52,11 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["滋养", "丰盛", "关系", "创造"],
     upright: "适合培养与生长：关系、作品或自我照顾都会开花结果。温柔但坚定。",
     reversed: "过度付出或失衡的照顾。先把自己补满，再谈给予。",
+    archetype: "滋养/丰盛",
+    light: "用稳定的爱与照顾让事物生长。",
+    shadow: "用付出换控制，或忽视自己的需要。",
+    reflectionQuestions: ["我在喂养谁/什么？我被喂养了吗？", "我能不能把照顾自己排进日程？"],
+    actionAdvice: ["做一个‘自我补给’安排并执行", "对过度索取/付出设定边界"],
   },
   {
     id: "the-emperor",
@@ -45,6 +66,11 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["规则", "结构", "领导", "责任"],
     upright: "建立秩序与规则会帮你稳住局面。用清晰的边界换来长期安全感。",
     reversed: "控制欲或结构僵化。放松一点“必须”，允许协作与弹性。",
+    archetype: "结构/秩序",
+    light: "用规则与边界保护长期目标。",
+    shadow: "把控制当安全感，导致关系或系统窒息。",
+    reflectionQuestions: ["我需要哪条规则来减少内耗？", "我在哪些地方过度控制？"],
+    actionAdvice: ["把规则写清并沟通给相关人", "给系统留 10% 弹性"],
   },
   {
     id: "the-hierophant",
@@ -198,6 +224,15 @@ export const MAJOR_ARCANA: TarotCard[] = [
     keywords: ["完成", "整合", "阶段性胜利", "新循环"],
     upright: "一个阶段圆满收束。庆祝成果，同时准备开启下一轮成长。",
     reversed: "差临门一脚。补齐最后的拼图（资源/沟通/收尾），就能完成。",
+    archetype: "完成/整合",
+    light: "把成果收束成结构，进入新的循环。",
+    shadow: "害怕结束而拖延收尾，或把自我价值绑在结果上。",
+    reflectionQuestions: ["我还差哪一块拼图？", "我怎样庆祝同时不放纵？"],
+    actionAdvice: ["做一个 3 项收尾清单", "为下一阶段设一个更小的目标"],
   },
 ];
+
+export const MINOR_ARCANA: TarotCard[] = createMinorArcana();
+
+export const TAROT_DECK: TarotCard[] = [...MAJOR_ARCANA, ...MINOR_ARCANA];
 

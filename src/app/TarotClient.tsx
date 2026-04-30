@@ -14,9 +14,16 @@ type ReadingResponse = {
   llmText?: string | null;
 };
 
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
 }
+
+const BYOK_STORAGE_KEY = "tarot.byok_api_key";
 
 export function TarotClient() {
   const [question, setQuestion] = useState(() => {
@@ -47,6 +54,16 @@ export function TarotClient() {
   const [reading, setReading] = useState<ReadingResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [useByok, setUseByok] = useState(false);
+  const [byokKey, setByokKey] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(BYOK_STORAGE_KEY) ?? "";
+  });
 
   const shareUrl = useMemo(() => {
     if (!reading) return null;
@@ -83,6 +100,14 @@ export function TarotClient() {
       if (!res.ok) throw new Error(`请求失败 (${res.status})`);
       const data = (await res.json()) as ReadingResponse;
       setReading(data);
+      setChatMessages([
+        {
+          role: "assistant",
+          content:
+            "我在这了。你可以继续追问：\n- 我最该优先做什么？\n- 这件事真正卡住我的点是什么？\n- 我该怎么和对方沟通？\n\n你也可以直接描述更多背景（越具体越准）。",
+        },
+      ]);
+      setChatError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "发生未知错误");
     } finally {
@@ -107,6 +132,46 @@ export function TarotClient() {
     await navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
+  }
+
+  async function sendChat() {
+    if (!reading) return;
+    const text = chatInput.trim();
+    if (!text) return;
+
+    setChatLoading(true);
+    setChatError(null);
+
+    const nextMessages: ChatMessage[] = [...chatMessages, { role: "user", content: text }];
+    setChatMessages(nextMessages);
+    setChatInput("");
+
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (useByok && byokKey.trim()) headers["x-llm-api-key"] = byokKey.trim();
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          question: reading.question,
+          spread: reading.spread,
+          seed: reading.seed,
+          allowReversed: reading.allowReversed,
+          messages: nextMessages,
+        }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as { reply?: string; error?: string };
+      if (!res.ok) throw new Error(data?.error || `请求失败 (${res.status})`);
+
+      const reply = typeof data.reply === "string" && data.reply.trim() ? data.reply.trim() : "我听见了。你还想把哪个点再说具体一点？";
+      setChatMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+    } catch (e) {
+      setChatError(e instanceof Error ? e.message : "发生未知错误");
+    } finally {
+      setChatLoading(false);
+    }
   }
 
   return (
@@ -254,7 +319,40 @@ export function TarotClient() {
                       <summary className="cursor-pointer select-none text-xs font-medium text-zinc-600 dark:text-zinc-400">
                         展开牌义
                       </summary>
-                      <div className="mt-2 leading-6">{c.reversed ? c.card.reversed : c.card.upright}</div>
+                      <div className="mt-2 grid gap-2 leading-6">
+                        {c.card.archetype ? (
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">原型：{c.card.archetype}</div>
+                        ) : null}
+                        {c.card.element ? (
+                          <div className="text-xs text-zinc-600 dark:text-zinc-400">元素：{c.card.element}</div>
+                        ) : null}
+                        {c.reversed ? (
+                          c.card.shadow ? <div>影：{c.card.shadow}</div> : null
+                        ) : c.card.light ? (
+                          <div>光：{c.card.light}</div>
+                        ) : null}
+                        <div className="text-sm">{c.reversed ? c.card.reversed : c.card.upright}</div>
+                        {c.card.reflectionQuestions?.length ? (
+                          <div className="mt-1">
+                            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400">自我提问</div>
+                            <ul className="mt-1 list-disc pl-5 text-sm">
+                              {c.card.reflectionQuestions.slice(0, 2).map((q) => (
+                                <li key={q}>{q}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {c.card.actionAdvice?.length ? (
+                          <div className="mt-1">
+                            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-400">行动建议</div>
+                            <ul className="mt-1 list-disc pl-5 text-sm">
+                              {c.card.actionAdvice.slice(0, 2).map((a) => (
+                                <li key={a}>{a}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
                     </details>
                   </div>
                 ))}
@@ -266,6 +364,96 @@ export function TarotClient() {
                   <pre className="mt-2 whitespace-pre-wrap text-sm leading-6 text-zinc-800 dark:text-zinc-200">
                     {reading.llmText?.trim() ? reading.llmText : reading.summary}
                   </pre>
+                </div>
+
+                <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-black">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm font-medium">继续追问（AI 占卜师）</div>
+                    <label className="inline-flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+                      <input
+                        type="checkbox"
+                        checked={useByok}
+                        onChange={(e) => setUseByok(e.target.checked)}
+                        className="h-4 w-4 accent-zinc-900 dark:accent-white"
+                      />
+                      让用户使用自带 API Key（BYOK）
+                    </label>
+                  </div>
+
+                  {useByok ? (
+                    <div className="mt-3 grid gap-2">
+                      <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                        说明：开启后会把你在本机输入的 key 通过请求头发送到后端，仅用于发起本次对话请求（不会写入分享链接）。
+                      </div>
+                      <input
+                        value={byokKey}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setByokKey(v);
+                          if (typeof window !== "undefined") window.localStorage.setItem(BYOK_STORAGE_KEY, v);
+                        }}
+                        placeholder="输入你的 LLM API Key（例如 DeepSeek）"
+                        className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-white/10"
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="mt-4 grid gap-3">
+                    <div className="max-h-[360px] overflow-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/30">
+                      <div className="grid gap-3">
+                        {chatMessages.map((m, idx) => (
+                          <div
+                            key={idx}
+                            className={cx(
+                              "rounded-xl px-3 py-2 text-sm leading-6",
+                              m.role === "user"
+                                ? "ml-auto max-w-[90%] bg-zinc-900 text-white dark:bg-white dark:text-black"
+                                : "mr-auto max-w-[90%] bg-white text-zinc-900 dark:bg-black dark:text-zinc-50 border border-zinc-200 dark:border-zinc-800"
+                            )}
+                          >
+                            <pre className="whitespace-pre-wrap">{m.content}</pre>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {chatError ? (
+                      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200">
+                        {chatError}
+                      </div>
+                    ) : null}
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            void sendChat();
+                          }
+                        }}
+                        placeholder="继续追问…（回车发送）"
+                        className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-4 text-sm outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-white/10"
+                      />
+                      <button
+                        onClick={sendChat}
+                        disabled={chatLoading}
+                        className={cx(
+                          "h-11 rounded-xl px-5 text-sm font-medium transition",
+                          chatLoading
+                            ? "bg-zinc-300 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                            : "bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
+                        )}
+                      >
+                        {chatLoading ? "思考中…" : "发送"}
+                      </button>
+                    </div>
+
+                    <div className="text-xs text-zinc-600 dark:text-zinc-400">
+                      提醒：建议一次只问一个点；如果涉及医疗/法律/财务等，请以专业意见为准。
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>

@@ -1,4 +1,4 @@
-import { MAJOR_ARCANA } from "./deck";
+import { TAROT_DECK } from "./deck";
 import { hashStringToUint32, mulberry32 } from "./rng";
 import type { DrawnCard, SpreadType, TarotCard } from "./types";
 
@@ -46,7 +46,7 @@ export function generateReading(input: ReadingInput): ReadingResult {
 
   const rng = mulberry32(hashStringToUint32(`${seed}::${question}::${spread}`));
   const positions = SPREAD_POSITIONS[spread];
-  const picked = drawUnique(rng, MAJOR_ARCANA, positions.length);
+  const picked = drawUnique(rng, TAROT_DECK, positions.length);
 
   const cards: DrawnCard[] = picked.map((card, i) => {
     const reversed = pickReversed(rng, allowReversed);
