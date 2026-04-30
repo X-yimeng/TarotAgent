@@ -12,7 +12,7 @@
           "buildCommand": "npm run build"
         }
       }
-    }
+    },
+    "name": "tarot-agent"
   }
 }
-
