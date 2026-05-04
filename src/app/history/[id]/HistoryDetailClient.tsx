@@ -174,14 +174,14 @@ function TarotCardImage({ card }: { card: DrawnCard }) {
   }
 
   return (
-    <div className="mb-4 grid place-items-center border border-stone-300 bg-stone-50 p-2">
+    <div className="relative mx-auto mb-4 aspect-[2/3] h-72 max-h-72 w-full max-w-48 overflow-hidden border border-stone-300 bg-stone-50 p-2">
       <Image
         src={imageUrl}
         alt={`${card.card.name} ${cardDirection(card)}`}
-        width={220}
-        height={330}
+        fill
+        sizes="(max-width: 768px) 45vw, 190px"
         loading="lazy"
-        className={`aspect-[2/3] max-h-72 w-auto object-contain ${card.reversed ? "rotate-180" : ""}`}
+        className={`object-contain p-2 ${card.reversed ? "rotate-180" : ""}`}
       />
     </div>
   );

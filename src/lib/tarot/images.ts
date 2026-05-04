@@ -1,6 +1,6 @@
 import type { TarotCard } from "./types";
 
-const BASE_URL = "https://www.sacred-texts.com/tarot/pkt/img";
+const BASE_URL = "/tarot/cards";
 
 const MAJOR_FILES: Record<string, string> = {
   "the-fool": "ar00.jpg",
