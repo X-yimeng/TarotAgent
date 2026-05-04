@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { fallbackInsight, type ReadingResponse, type TarotInsight } from "@/lib/tarot/insight";
 import { loadJournal, saveJournal, type JournalEntry } from "@/lib/tarot/journal";
 import type { ChatMessage } from "@/lib/tarot/messages";
+import { getTarotImageUrl } from "@/lib/tarot/images";
 import { randomSeedString } from "@/lib/tarot/rng";
 import type { DrawnCard, SpreadType } from "@/lib/tarot/types";
 
@@ -343,8 +345,9 @@ export function TarotClient() {
                   {reading.cards.map((card) => (
                     <article
                       key={`${card.position}-${card.card.id}`}
-                      className="flex min-h-[430px] flex-col border border-stone-300 bg-stone-50 p-4"
+                      className="flex min-h-[560px] flex-col border border-stone-300 bg-stone-50 p-4"
                     >
+                      <TarotCardImage card={card} />
                       <div>
                         <div className="text-xs font-medium text-stone-500">{card.position}</div>
                         <h3 className="mt-1 text-lg font-semibold">{card.card.name}</h3>
@@ -580,6 +583,31 @@ function InsightPanel({ insight }: { insight: TarotInsight }) {
           </ul>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TarotCardImage({ card }: { card: DrawnCard }) {
+  const imageUrl = getTarotImageUrl(card.card);
+
+  if (!imageUrl) {
+    return (
+      <div className="mb-4 grid aspect-[2/3] w-full place-items-center border border-stone-300 bg-stone-100 text-xs text-stone-500">
+        暂无牌图
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 grid place-items-center border border-stone-300 bg-white p-2">
+      <Image
+        src={imageUrl}
+        alt={`${card.card.name} ${cardDirection(card)}`}
+        width={220}
+        height={330}
+        loading="lazy"
+        className={cx("aspect-[2/3] max-h-64 w-auto object-contain transition-transform", card.reversed && "rotate-180")}
+      />
     </div>
   );
 }

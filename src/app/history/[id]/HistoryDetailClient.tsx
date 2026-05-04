@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { fallbackInsight, type TarotInsight } from "@/lib/tarot/insight";
 import { loadJournal, updateJournalEntry, type JournalEntry } from "@/lib/tarot/journal";
+import { getTarotImageUrl } from "@/lib/tarot/images";
 import type { DrawnCard } from "@/lib/tarot/types";
 
 function formatDate(value: string) {
@@ -106,6 +108,7 @@ export function HistoryDetailClient({ id }: { id: string }) {
         <section className="grid gap-3 md:grid-cols-3">
           {entry.cards.map((card) => (
             <article key={`${card.position}-${card.card.id}`} className="border border-stone-300 bg-white p-4 shadow-sm">
+              <TarotCardImage card={card} />
               <div className="text-xs font-medium text-stone-500">{card.position}</div>
               <h3 className="mt-1 text-lg font-semibold">{card.card.name}</h3>
               <p className="mt-1 text-xs leading-5 text-stone-500">
@@ -156,6 +159,31 @@ export function HistoryDetailClient({ id }: { id: string }) {
         </section>
       </div>
     </main>
+  );
+}
+
+function TarotCardImage({ card }: { card: DrawnCard }) {
+  const imageUrl = getTarotImageUrl(card.card);
+
+  if (!imageUrl) {
+    return (
+      <div className="mb-4 grid aspect-[2/3] w-full place-items-center border border-stone-300 bg-stone-100 text-xs text-stone-500">
+        暂无牌图
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 grid place-items-center border border-stone-300 bg-stone-50 p-2">
+      <Image
+        src={imageUrl}
+        alt={`${card.card.name} ${cardDirection(card)}`}
+        width={220}
+        height={330}
+        loading="lazy"
+        className={`aspect-[2/3] max-h-72 w-auto object-contain ${card.reversed ? "rotate-180" : ""}`}
+      />
+    </div>
   );
 }
 
