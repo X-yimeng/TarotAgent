@@ -1,31 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { fallbackInsight, type ReadingResponse, type TarotInsight } from "@/lib/tarot/insight";
+import { loadJournal, saveJournal, type JournalEntry } from "@/lib/tarot/journal";
+import type { ChatMessage } from "@/lib/tarot/messages";
 import { randomSeedString } from "@/lib/tarot/rng";
 import type { DrawnCard, SpreadType } from "@/lib/tarot/types";
-
-type ReadingResponse = {
-  question: string;
-  spread: SpreadType;
-  seed: string;
-  allowReversed: boolean;
-  cards: DrawnCard[];
-  summary: string;
-  llmText?: string | null;
-};
-
-type ChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
-
-type JournalEntry = ReadingResponse & {
-  id: string;
-  createdAt: string;
-  reviewNote: string;
-};
-
-const JOURNAL_STORAGE_KEY = "tarot.insight_agent.journal.v1";
 
 function cx(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -40,24 +21,20 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function summarizeCard(card: DrawnCard) {
+function cardMeaning(card: DrawnCard) {
   return card.reversed ? card.card.reversed : card.card.upright;
 }
 
-function loadJournal(): JournalEntry[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(JOURNAL_STORAGE_KEY);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data.slice(0, 20) : [];
-  } catch {
-    return [];
-  }
+function cardDirection(card: DrawnCard) {
+  return card.reversed ? "逆位" : "正位";
 }
 
-function saveJournal(entries: JournalEntry[]) {
-  window.localStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(entries.slice(0, 20)));
+function initialAssistantMessage() {
+  return "我会围绕这次牌面继续帮你澄清。你可以补充问题类型、当前处境、最担心的点，或你希望我帮你判断什么。";
+}
+
+function getInsight(reading: ReadingResponse): TarotInsight {
+  return reading.insight ?? fallbackInsight(reading);
 }
 
 export function TarotClient() {
@@ -89,6 +66,7 @@ export function TarotClient() {
 
   const [journal, setJournal] = useState<JournalEntry[]>(loadJournal);
   const [reviewNote, setReviewNote] = useState("");
+  const [guidanceAnswer, setGuidanceAnswer] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -122,6 +100,9 @@ export function TarotClient() {
     return journal.find((item) => item.seed === reading.seed && item.question === reading.question) ?? null;
   }, [journal, reading]);
 
+  const insight = reading ? getInsight(reading) : null;
+  const aiUnavailable = reading ? !reading.insight : false;
+
   async function fetchReading(input: {
     question: string;
     spread: SpreadType;
@@ -144,15 +125,10 @@ export function TarotClient() {
       const data = (await res.json()) as ReadingResponse;
       setReading(data);
       setReviewNote("");
-      setChatMessages([
-        {
-          role: "assistant",
-          content:
-            "这次阅读已经生成。你可以继续问：这张牌在提醒我什么？我该怎么判断下一步？或者把你的背景补充给我，我会围绕这组牌帮你澄清。",
-        },
-      ]);
+      setGuidanceAnswer("");
+      setChatMessages([{ role: "assistant", content: initialAssistantMessage() }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "抽牌时遇到问题，请稍后再试。");
+      setError(e instanceof Error ? e.message : "抽牌失败，请稍后再试。");
     } finally {
       setLoading(false);
     }
@@ -192,25 +168,12 @@ export function TarotClient() {
       id: activeJournalEntry?.id ?? `${reading.seed}-${Date.now()}`,
       createdAt: activeJournalEntry?.createdAt ?? new Date().toISOString(),
       reviewNote,
+      chatMessages,
+      guidanceAnswer,
     };
-    const next = [nextEntry, ...journal.filter((item) => item.id !== nextEntry.id)].slice(0, 20);
+    const next = [nextEntry, ...journal.filter((item) => item.id !== nextEntry.id)].slice(0, 30);
     setJournal(next);
     saveJournal(next);
-  }
-
-  function openJournalEntry(entry: JournalEntry) {
-    setReading(entry);
-    setQuestion(entry.question);
-    setSpread(entry.spread);
-    setSeed(entry.seed);
-    setAllowReversed(entry.allowReversed);
-    setReviewNote(entry.reviewNote);
-    setChatMessages([
-      {
-        role: "assistant",
-        content: "已打开这次历史阅读。你可以继续围绕这组牌追问，或更新复盘备注。",
-      },
-    ]);
   }
 
   function deleteJournalEntry(id: string) {
@@ -219,9 +182,9 @@ export function TarotClient() {
     saveJournal(next);
   }
 
-  async function sendChat() {
+  async function sendChat(overrideText?: string, nextGuidanceAnswer?: string) {
     if (!reading) return;
-    const text = chatInput.trim();
+    const text = (overrideText ?? chatInput).trim();
     if (!text) return;
 
     const nextMessages: ChatMessage[] = [...chatMessages, { role: "user", content: text }];
@@ -239,6 +202,8 @@ export function TarotClient() {
           spread: reading.spread,
           seed: reading.seed,
           allowReversed: reading.allowReversed,
+          insight: reading.insight,
+          guidanceAnswer: nextGuidanceAnswer ?? guidanceAnswer,
           messages: nextMessages,
         }),
       });
@@ -249,25 +214,22 @@ export function TarotClient() {
         ...prev,
         {
           role: "assistant",
-          content: data.reply?.trim() || "我暂时没有生成清晰回应。你可以换一种更具体的问法。",
+          content: data.reply?.trim() || "我暂时没有生成新的建议。你可以再补充一点当前处境。",
         },
       ]);
     } catch (e) {
-      setChatError(e instanceof Error ? e.message : "AI 追问暂不可用，但本次抽牌和本地复盘仍可使用。");
+      setChatError(e instanceof Error ? e.message : "AI 追问暂不可用，基础牌义和本地记录仍可使用。");
     } finally {
       setChatLoading(false);
     }
   }
 
-  const actionItems = useMemo(() => {
-    if (!reading) return [];
-    return Array.from(new Set(reading.cards.flatMap((c) => c.card.actionAdvice ?? []))).slice(0, 4);
-  }, [reading]);
-
-  const reflectionItems = useMemo(() => {
-    if (!reading) return [];
-    return Array.from(new Set(reading.cards.flatMap((c) => c.card.reflectionQuestions ?? []))).slice(0, 4);
-  }, [reading]);
+  async function continueWithGuidance() {
+    if (!insight) return;
+    const answer = guidanceAnswer.trim();
+    if (!answer) return;
+    await sendChat(`针对引导问题「${insight.guidancePrompt.question}」，我的补充是：${answer}`, answer);
+  }
 
   return (
     <div className="min-h-full flex-1 bg-[#f7f3ee] text-stone-950">
@@ -280,7 +242,7 @@ export function TarotClient() {
               </div>
               <div>
                 <h1 className="text-2xl font-semibold tracking-tight">塔罗洞察 Agent</h1>
-                <p className="text-sm text-stone-600">用抽牌、反思问题和下一步行动，把模糊的困惑整理成可照看的线索。</p>
+                <p className="text-sm text-stone-600">先澄清问题，再抽牌、解读、追问和复盘。用于自我反思和娱乐，不替代专业建议。</p>
               </div>
             </div>
           </header>
@@ -289,13 +251,13 @@ export function TarotClient() {
             <div className="grid gap-4">
               <div>
                 <div className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Step 1</div>
-                <h2 className="mt-1 text-lg font-semibold">先把问题说清楚</h2>
+                <h2 className="mt-1 text-lg font-semibold">写下你想澄清的问题</h2>
               </div>
               <textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 rows={4}
-                placeholder="例如：我最近在犹豫要不要换工作，真正卡住我的是什么？"
+                placeholder="例如：我最近犹豫要不要换工作，卡住我的是什么？"
                 className="w-full resize-none border border-stone-300 bg-stone-50 px-3 py-3 text-sm leading-6 outline-none focus:border-stone-900"
               />
               <div className="grid gap-3 md:grid-cols-3">
@@ -307,7 +269,7 @@ export function TarotClient() {
                     className="h-11 border border-stone-300 bg-white px-3 text-sm outline-none focus:border-stone-900"
                   >
                     <option value="three">三张牌：过去 / 现在 / 建议</option>
-                    <option value="one">单张牌：核心提醒</option>
+                    <option value="one">单张牌：核心提示</option>
                   </select>
                 </label>
                 <label className="grid gap-2">
@@ -338,23 +300,21 @@ export function TarotClient() {
                     loading ? "bg-stone-400" : "bg-stone-950 hover:bg-stone-800"
                   )}
                 >
-                  {loading ? "正在生成洞察..." : "生成本次洞察"}
+                  {loading ? "正在生成洞察..." : "抽牌并生成洞察"}
                 </button>
-                <p className="text-xs leading-5 text-stone-500">
-                  用于自我反思和娱乐，不替代医疗、法律、财务等专业建议。
-                </p>
+                <p className="text-xs leading-5 text-stone-500">AI 密钥只在服务端使用。没有密钥时仍可抽牌，并显示本地牌义摘要。</p>
               </div>
               {error ? <div className="border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
             </div>
           </section>
 
-          {reading ? (
+          {reading && insight ? (
             <section className="grid gap-5">
               <div className="border border-stone-300 bg-white p-4 shadow-sm">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Step 2</div>
-                    <h2 className="mt-1 text-xl font-semibold">{reading.question || "无具体问题的当下提醒"}</h2>
+                    <h2 className="mt-1 text-xl font-semibold">{reading.question || "没有具体问题的开放式阅读"}</h2>
                     <p className="mt-1 text-xs text-stone-500">
                       {reading.spread === "three" ? "三张牌" : "单张牌"} / seed {reading.seed}
                     </p>
@@ -381,16 +341,19 @@ export function TarotClient() {
 
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   {reading.cards.map((card) => (
-                    <article key={`${card.position}-${card.card.id}`} className="grid gap-3 border border-stone-300 bg-stone-50 p-4">
+                    <article
+                      key={`${card.position}-${card.card.id}`}
+                      className="flex min-h-[430px] flex-col border border-stone-300 bg-stone-50 p-4"
+                    >
                       <div>
                         <div className="text-xs font-medium text-stone-500">{card.position}</div>
                         <h3 className="mt-1 text-lg font-semibold">{card.card.name}</h3>
-                        <p className="mt-1 text-xs text-stone-500">
-                          {card.reversed ? "逆位" : "正位"} / {card.card.keywords.join("、")}
+                        <p className="mt-1 text-xs leading-5 text-stone-500">
+                          {cardDirection(card)} / {card.card.keywords.join("、")}
                         </p>
                       </div>
-                      <p className="text-sm leading-6 text-stone-700">{summarizeCard(card)}</p>
-                      <details className="border-t border-stone-300 pt-3 text-sm">
+                      <p className="mt-3 flex-1 text-sm leading-6 text-stone-700">{cardMeaning(card)}</p>
+                      <details className="mt-4 border-t border-stone-300 pt-3 text-sm">
                         <summary className="cursor-pointer font-medium">展开反思与行动</summary>
                         <div className="mt-3 grid gap-3">
                           {card.card.reflectionQuestions?.length ? (
@@ -420,18 +383,16 @@ export function TarotClient() {
                 </div>
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+              <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
                 <section className="border border-stone-300 bg-white p-4 shadow-sm">
                   <div className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Step 3</div>
                   <h2 className="mt-1 text-lg font-semibold">洞察摘要</h2>
-                  {!reading.llmText ? (
+                  {aiUnavailable ? (
                     <div className="mt-3 border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       AI 解读暂不可用，正在使用本地牌义摘要。请在 CloudBase 环境变量中配置 LLM_API_KEY 启用完整洞察。
                     </div>
                   ) : null}
-                  <pre className="mt-3 whitespace-pre-wrap text-sm leading-7 text-stone-700">
-                    {reading.llmText?.trim() || reading.summary}
-                  </pre>
+                  <InsightPanel insight={insight} />
                 </section>
 
                 <aside className="grid content-start gap-4 border border-stone-300 bg-white p-4 shadow-sm">
@@ -439,18 +400,30 @@ export function TarotClient() {
                     <div className="text-xs font-medium uppercase tracking-[0.18em] text-stone-500">Step 4</div>
                     <h2 className="mt-1 text-lg font-semibold">下一步</h2>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium">可以问自己的问题</div>
-                    <ul className="mt-2 list-disc pl-5 text-sm leading-6 text-stone-700">
-                      {reflectionItems.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
+                  <div className="grid gap-2">
+                    <div className="text-sm font-semibold">定制引导问题</div>
+                    <p className="text-sm leading-6 text-stone-700">{insight.guidancePrompt.question}</p>
+                    <input
+                      value={guidanceAnswer}
+                      onChange={(e) => setGuidanceAnswer(e.target.value)}
+                      placeholder={insight.guidancePrompt.placeholder}
+                      className="h-11 w-full border border-stone-300 bg-stone-50 px-3 text-sm outline-none focus:border-stone-900"
+                    />
+                    <button
+                      onClick={continueWithGuidance}
+                      disabled={chatLoading || !guidanceAnswer.trim()}
+                      className={cx(
+                        "h-10 px-3 text-sm font-semibold text-white",
+                        chatLoading || !guidanceAnswer.trim() ? "bg-stone-400" : "bg-stone-950 hover:bg-stone-800"
+                      )}
+                    >
+                      {chatLoading ? "追问中..." : "继续追问"}
+                    </button>
                   </div>
                   <div>
-                    <div className="text-sm font-medium">24 小时内的小行动</div>
+                    <div className="text-sm font-semibold">24 小时内的小行动</div>
                     <ul className="mt-2 list-disc pl-5 text-sm leading-6 text-stone-700">
-                      {actionItems.map((item) => (
+                      {insight.actions.map((item) => (
                         <li key={item}>{item}</li>
                       ))}
                     </ul>
@@ -473,7 +446,7 @@ export function TarotClient() {
                               : "mr-auto border border-stone-300 bg-white text-stone-800"
                           )}
                         >
-                          <pre className="whitespace-pre-wrap">{message.content}</pre>
+                          <p className="whitespace-pre-wrap">{message.content}</p>
                         </div>
                       ))}
                     </div>
@@ -491,38 +464,38 @@ export function TarotClient() {
                           void sendChat();
                         }
                       }}
-                      placeholder="例如：我现在最该注意哪张牌？"
+                      placeholder="继续问：这张牌和我的选择有什么关系？"
                       className="h-11 flex-1 border border-stone-300 bg-white px-3 text-sm outline-none focus:border-stone-900"
                     />
                     <button
-                      onClick={sendChat}
+                      onClick={() => sendChat()}
                       disabled={chatLoading}
                       className={cx(
                         "h-11 px-5 text-sm font-semibold text-white",
                         chatLoading ? "bg-stone-400" : "bg-stone-950 hover:bg-stone-800"
                       )}
                     >
-                      {chatLoading ? "思考中..." : "发送"}
+                      {chatLoading ? "生成中..." : "发送"}
                     </button>
                   </div>
                 </div>
 
                 <div className="border border-stone-300 bg-white p-4 shadow-sm">
-                  <h2 className="text-lg font-semibold">本次复盘</h2>
+                  <h2 className="text-lg font-semibold">复盘备注</h2>
                   <textarea
                     value={reviewNote}
                     onChange={(e) => setReviewNote(e.target.value)}
                     rows={8}
-                    placeholder="记录：这次阅读让我看见了什么？我后来实际做了什么？"
+                    placeholder="之后回来写：我采取了什么行动？结果如何？这次阅读哪里帮到了我？"
                     className="mt-3 w-full resize-none border border-stone-300 bg-stone-50 px-3 py-2 text-sm leading-6 outline-none focus:border-stone-900"
                   />
                   <button
                     onClick={persistCurrentReading}
                     className="mt-3 h-10 w-full bg-stone-950 px-3 text-sm font-semibold text-white hover:bg-stone-800"
                   >
-                    保存到本地记录
+                    保存到本地历史
                   </button>
-                  <p className="mt-2 text-xs leading-5 text-stone-500">记录只保存在当前浏览器，不会上传到服务器。</p>
+                  <p className="mt-2 text-xs leading-5 text-stone-500">记录只保存在你的浏览器本地，不会上传到服务端。</p>
                 </div>
               </section>
             </section>
@@ -536,13 +509,13 @@ export function TarotClient() {
               <div className="mt-3 grid gap-3">
                 {journal.map((entry) => (
                   <article key={entry.id} className="border border-stone-200 bg-stone-50 p-3">
-                    <button onClick={() => openJournalEntry(entry)} className="block w-full text-left">
+                    <Link href={`/history/${encodeURIComponent(entry.id)}`} className="block">
                       <div className="text-xs text-stone-500">{formatDate(entry.createdAt)}</div>
-                      <div className="mt-1 line-clamp-2 text-sm font-medium">{entry.question || "无具体问题的当下提醒"}</div>
-                      <div className="mt-1 text-xs text-stone-500">
+                      <div className="mt-1 line-clamp-2 text-sm font-medium">{entry.question || "没有具体问题的开放式阅读"}</div>
+                      <div className="mt-1 text-xs leading-5 text-stone-500">
                         {entry.spread === "three" ? "三张牌" : "单张牌"} / {entry.cards.map((c) => c.card.name).join("、")}
                       </div>
-                    </button>
+                    </Link>
                     <button
                       onClick={() => deleteJournalEntry(entry.id)}
                       className="mt-2 text-xs font-medium text-stone-500 hover:text-red-700"
@@ -553,17 +526,59 @@ export function TarotClient() {
                 ))}
               </div>
             ) : (
-              <p className="mt-3 text-sm leading-6 text-stone-500">保存一次阅读后，这里会出现你的本地复盘记录。</p>
+              <p className="mt-3 text-sm leading-6 text-stone-500">保存一次阅读后，这里会出现完整记录，并可进入详情页复盘。</p>
             )}
           </section>
 
           <section className="border border-stone-300 bg-stone-950 p-4 text-white shadow-sm">
             <h2 className="text-lg font-semibold">使用边界</h2>
             <p className="mt-2 text-sm leading-6 text-stone-300">
-              这个工具帮助你整理感受、关系和选择，不做绝对预测，也不替代专业建议。遇到医疗、法律、财务或安全问题，请优先联系专业人士。
+              塔罗在这里被当作反思工具：帮助你组织感受、识别模式和选择小行动。它不替代医疗、法律、财务建议，也不替你做重大决定。
             </p>
           </section>
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function InsightPanel({ insight }: { insight: TarotInsight }) {
+  return (
+    <div className="mt-4 grid gap-5 text-sm leading-7 text-stone-700">
+      <div className="border-l-2 border-stone-950 pl-4">
+        <h3 className="text-base font-semibold text-stone-950">{insight.title}</h3>
+        <p className="mt-2">{insight.core}</p>
+        <p className="mt-2 text-stone-600">{insight.questionLink}</p>
+      </div>
+      <div className="grid gap-3">
+        <h3 className="text-base font-semibold text-stone-950">每张牌如何回应你的问题</h3>
+        {insight.cardReadings.map((item) => (
+          <div key={`${item.position}-${item.card}`} className="border border-stone-200 bg-stone-50 p-3">
+            <div className="text-xs font-medium text-stone-500">
+              {item.position} / {item.direction}
+            </div>
+            <div className="mt-1 font-semibold text-stone-950">{item.card}</div>
+            <p className="mt-1">{item.message}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <h3 className="text-base font-semibold text-stone-950">反思问题</h3>
+          <ul className="mt-2 list-disc pl-5">
+            {insight.reflections.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-stone-950">行动建议</h3>
+          <ul className="mt-2 list-disc pl-5">
+            {insight.actions.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

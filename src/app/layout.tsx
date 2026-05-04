@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "塔罗洞察 Agent",
-  description: "用塔罗牌、反思问题和行动建议整理当下困惑。",
+  description: "用塔罗牌面进行问题澄清、结构化洞察、追问和本地复盘。",
 };
 
 export default function RootLayout({

@@ -19,7 +19,7 @@ export type ReadingResult = {
 };
 
 const SPREAD_POSITIONS: Record<SpreadType, string[]> = {
-  one: ["当下的核心提醒"],
+  one: ["核心提示"],
   three: ["过去的影响", "现在的状态", "下一步建议"],
 };
 
@@ -64,32 +64,33 @@ export function generateReading(input: ReadingInput): ReadingResult {
   };
 }
 
-function cardMeaning(card: DrawnCard): string {
+export function cardMeaning(card: DrawnCard): string {
   return card.reversed ? card.card.reversed : card.card.upright;
+}
+
+export function cardDirection(card: DrawnCard): string {
+  return card.reversed ? "逆位" : "正位";
 }
 
 function buildSummary(question: string, cards: DrawnCard[]): string {
   const theme = Array.from(new Set(cards.flatMap((c) => c.card.keywords))).slice(0, 5).join(" / ");
-  const lines = cards.map((c) => {
-    const direction = c.reversed ? "逆位" : "正位";
-    return `- ${c.position}：${c.card.name}（${direction}）提示 ${cardMeaning(c)}`;
-  });
+  const lines = cards.map((c) => `- ${c.position}: ${c.card.name}（${cardDirection(c)}）提示 ${cardMeaning(c)}`);
   const actions = Array.from(new Set(cards.flatMap((c) => c.card.actionAdvice ?? []))).slice(0, 3);
   const reflections = Array.from(new Set(cards.flatMap((c) => c.card.reflectionQuestions ?? []))).slice(0, 3);
 
   return [
-    `问题：${question || "暂未输入具体问题"}`,
-    `主题线索：${theme || "观察当下、辨认真相、采取小行动"}`,
+    `问题: ${question || "尚未写下具体问题"}`,
+    `主题线索: ${theme || "自我觉察 / 行动选择"}`,
     "",
-    "牌面洞察：",
+    "牌面洞察:",
     ...lines,
     "",
-    "反思问题：",
+    "可以问自己的问题:",
     ...reflections.map((x) => `- ${x}`),
     "",
-    "下一步行动：",
+    "下一步小行动:",
     ...actions.map((x) => `- ${x}`),
     "",
-    "温和提醒：塔罗适合作为自我反思工具，不替代医疗、法律、财务等专业建议，也不需要把牌面当成绝对预言。",
+    "提醒: 塔罗适合用于自我反思和娱乐，不替代医疗、法律、财务建议，也不替你做重大决定。",
   ].join("\n");
 }
