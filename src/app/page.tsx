@@ -5,8 +5,8 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-full flex-1 grid place-items-center text-sm text-zinc-600 dark:text-zinc-400">
-          正在加载…
+        <div className="grid min-h-screen place-items-center bg-[#f7f3ee] text-sm text-stone-600">
+          正在打开塔罗洞察 Agent...
         </div>
       }
     >

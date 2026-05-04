@@ -14,5 +14,8 @@
       }
     },
     "name": "tarot-agent"
+  },
+  "cloudrun": {
+    "name": "tarot-agent"
   }
 }

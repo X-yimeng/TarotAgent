@@ -1,6 +1,6 @@
 import type { TarotCard, TarotElement, TarotSuit } from "./types";
 
-const SUIT_INFO: Record<
+const SUITS: Record<
   TarotSuit,
   {
     zh: string;
@@ -13,205 +13,171 @@ const SUIT_INFO: Record<
   wands: {
     zh: "权杖",
     element: "fire",
-    themes: ["行动", "热情", "意志", "创造力"],
-    light: "把火点起来：启动、推动、敢于表达并承担后果。",
-    shadow: "火失控或熄灭：冲动、拖延、三分钟热度、耗竭。",
+    themes: ["行动", "热情", "创造", "方向"],
+    light: "把想法落到行动里，用一次小尝试验证热情是否真实。",
+    shadow: "容易急躁、分散或只靠冲动推进，需要先确认优先级。",
   },
   cups: {
     zh: "圣杯",
     element: "water",
-    themes: ["情感", "关系", "直觉", "共情"],
-    light: "允许情绪流动：连接、滋养、表达感受与需要。",
-    shadow: "情绪泛滥或冻结：依赖、逃避、幻想、压抑。",
+    themes: ["情绪", "关系", "直觉", "滋养"],
+    light: "允许感受被看见，也让关系里的真实需要浮出水面。",
+    shadow: "可能沉在想象、依赖或过度敏感里，需要回到事实与边界。",
   },
   swords: {
     zh: "宝剑",
     element: "air",
-    themes: ["思考", "沟通", "真相", "边界"],
-    light: "把话说清：分析、决断、澄清事实与规则。",
-    shadow: "思维过载：苛刻、焦虑、争辩、伤人或自伤的语言。",
+    themes: ["思考", "沟通", "判断", "真相"],
+    light: "用清晰语言切开问题，分辨事实、推测和情绪。",
+    shadow: "容易过度分析、尖锐防御或陷入自我消耗，需要停下内耗。",
   },
   pentacles: {
-    zh: "钱币",
+    zh: "星币",
     element: "earth",
-    themes: ["现实", "资源", "身体", "长期积累"],
-    light: "脚踏实地：稳定、积累、把计划落到时间与资源上。",
-    shadow: "过度保守或物化：拖慢、贪心、麻木、只看短期收益。",
+    themes: ["现实", "资源", "身体", "稳定"],
+    light: "把洞察落实到时间、金钱、身体和可执行步骤上。",
+    shadow: "可能过度求稳、害怕损失或忽略长期价值，需要重新评估投入。",
   },
 };
 
-type RankMeta = {
-  rank: string;
-  num: number;
-  stage: string;
-  light: string;
-  shadow: string;
-  keywords: string[];
-  reflection: string[];
-  actions: string[];
-};
-
-// A compact, original synthesis of numerology-style stages (Ace..10).
-const NUMBER_META: Record<number, Omit<RankMeta, "rank" | "num">> = {
-  1: {
-    stage: "开端/种子",
-    light: "新的机会出现，能量干净而直接，适合点火。",
-    shadow: "想法很多但没落地，或把机会当成‘保证’。",
-    keywords: ["开始", "灵感", "机会"],
-    reflection: ["我真正想启动的是什么？", "我愿意为它投入哪 30 分钟？"],
-    actions: ["把目标拆成 1 个最小动作并立刻做", "把资源/时间写成一行计划"],
-  },
-  2: {
-    stage: "选择/张力",
-    light: "两股力量在拉扯，你需要比较与协调。",
-    shadow: "犹豫拖延或两面讨好，导致能量分散。",
-    keywords: ["选择", "平衡", "合作"],
-    reflection: ["我在避免哪个决定？", "我的底线与优先级是什么？"],
-    actions: ["写下 A/B 的代价与收益", "先做一个可逆的小决定验证方向"],
-  },
-  3: {
-    stage: "表达/扩张",
-    light: "形成可被看见的成果：沟通、创作、连接。",
-    shadow: "只顾热闹、不顾结构，或过度取悦他人。",
-    keywords: ["表达", "增长", "协作"],
-    reflection: ["我希望别人听见/看见什么？", "我在关系里怎么表达需要？"],
-    actions: ["把想法做成一个可展示的版本", "发出一次清晰邀请/沟通"],
-  },
-  4: {
-    stage: "结构/稳定",
-    light: "建立秩序与边界，让系统可持续。",
-    shadow: "僵化、保守或被安全感绑住。",
-    keywords: ["稳定", "边界", "秩序"],
-    reflection: ["什么规则能让我更轻松？", "我在哪些地方过度控制？"],
-    actions: ["设定一个可执行的日程/规则", "把‘必须’改成‘选择’并写下理由"],
-  },
-  5: {
-    stage: "冲突/变化",
-    light: "变化带来突破：试错、移动、升级策略。",
-    shadow: "对抗成瘾、情绪化反应或失控。",
-    keywords: ["变化", "摩擦", "试错"],
-    reflection: ["我在抗拒什么变化？", "冲突想教我学会什么？"],
-    actions: ["把冲突点改写成需求", "做一次小幅调整而不是翻桌"],
-  },
-  6: {
-    stage: "对齐/关系",
-    light: "更成熟的选择与承诺：价值观对齐、互惠。",
-    shadow: "取悦、内疚或失衡付出。",
-    keywords: ["对齐", "承诺", "互惠"],
-    reflection: ["我真正重视的是什么？", "我愿意对什么负责？"],
-    actions: ["和关键人物对齐目标/边界", "用一句话明确你的承诺或拒绝"],
-  },
-  7: {
-    stage: "意志/推进",
-    light: "带着方向感前进，耐心与自律带来胜利。",
-    shadow: "疑虑、拖延或过度用力导致反弹。",
-    keywords: ["推进", "自律", "胜利"],
-    reflection: ["我正在为谁证明？", "真正的目标是什么？"],
-    actions: ["设定一个 7 天可衡量的里程碑", "减少一个分心源"],
-  },
-  8: {
-    stage: "力量/掌控",
-    light: "稳稳地驾驭资源与能量，提升影响力。",
-    shadow: "控制欲、过度压榨或只看结果。",
-    keywords: ["力量", "掌控", "效率"],
-    reflection: ["我想掌控的是恐惧还是目标？", "我能不能更温柔地强大？"],
-    actions: ["优化一个流程/习惯", "把‘强硬’换成‘清晰’的边界"],
-  },
-  9: {
-    stage: "收敛/洞察",
-    light: "回到内在总结经验，提炼真正的智慧。",
-    shadow: "封闭、过度反思或迟迟不行动。",
-    keywords: ["复盘", "洞察", "独处"],
-    reflection: ["我学到的关键规律是什么？", "我在害怕哪个结果？"],
-    actions: ["写 5 行复盘并提炼 1 条原则", "做一次低风险的试运行"],
-  },
-  10: {
-    stage: "完成/循环",
-    light: "阶段性结果出现，进入下一轮更高阶的课题。",
-    shadow: "被结果绑架：要么过度庆祝、要么自我否定。",
-    keywords: ["完成", "结果", "循环"],
-    reflection: ["这一轮我真正获得了什么？", "下一轮我想换一种方式吗？"],
-    actions: ["做收尾清单（3 件事以内）", "为下一阶段设一个更小但更清晰的目标"],
-  },
-};
-
-const COURT_META: Record<
-  "Page" | "Knight" | "Queen" | "King",
+const NUMBER_STAGES: Record<
+  number,
   {
-    stage: string;
-    light: string;
-    shadow: string;
+    label: string;
     keywords: string[];
+    upright: string;
+    reversed: string;
     reflection: string[];
     actions: string[];
   }
 > = {
-  Page: {
-    stage: "学习者/信使",
-    light: "新鲜、好奇、愿意练习；带来一条消息或灵感。",
-    shadow: "幼稚、三心二意、只停留在想象。",
-    keywords: ["学习", "消息", "好奇"],
-    reflection: ["我需要补哪块基本功？", "我是不是把‘不会’当成了借口？"],
-    actions: ["做一次小实验并记录结果", "向靠谱的人请教一个具体问题"],
+  1: {
+    label: "种子",
+    keywords: ["开始", "潜能", "机会"],
+    upright: "新的可能正在出现，重点不是一次做到完美，而是先让它开始。",
+    reversed: "机会存在，但能量还没有聚焦；你可能在等待一个永远不会完美的时机。",
+    reflection: ["我最想启动的是什么？", "我在等什么条件才允许自己开始？"],
+    actions: ["用 20 分钟做一个最小版本。", "写下这件事最小的下一步。"],
   },
-  Knight: {
-    stage: "行动者/推进者",
-    light: "敢冲敢做，推动变化与执行。",
-    shadow: "鲁莽、急躁、忽略后果与他人感受。",
-    keywords: ["行动", "推进", "冒险"],
-    reflection: ["我是在追求目标还是逃避感受？", "我冲得够稳吗？"],
-    actions: ["把‘冲’变成两步：计划→执行", "设一个停止条件避免失控"],
+  2: {
+    label: "选择",
+    keywords: ["平衡", "选择", "回应"],
+    upright: "你正在比较两个方向，答案来自倾听，而不是立刻证明谁对谁错。",
+    reversed: "摇摆拖慢了行动，也可能说明你还没有承认真正的偏好。",
+    reflection: ["我真正偏向哪一个选择？", "我害怕失去什么？"],
+    actions: ["列出两个选项各自的代价。", "向一个可信的人复述你的选择困境。"],
   },
-  Queen: {
-    stage: "容纳者/管理者",
-    light: "成熟、滋养、能把能量变成可持续的系统。",
-    shadow: "过度保护、情绪化掌控或过度付出。",
-    keywords: ["滋养", "成熟", "稳定"],
-    reflection: ["我真正需要被照顾的是什么？", "我有没有把界限说清？"],
-    actions: ["做一个自我照顾的具体安排", "把支持与边界同时表达出来"],
+  3: {
+    label: "生长",
+    keywords: ["表达", "协作", "展开"],
+    upright: "事情开始成形，适合把想法说出来，邀请反馈和协作。",
+    reversed: "表达被卡住，或合作里有未说清的期待。",
+    reflection: ["我需要谁的支持？", "哪些话我还没有说出口？"],
+    actions: ["发出一次明确邀请。", "把模糊期待改写成一句请求。"],
   },
-  King: {
-    stage: "权威者/决策者",
-    light: "负责、清晰、以长期利益做决策并承担结果。",
-    shadow: "专断、冷酷、把人当工具或害怕失去控制。",
-    keywords: ["责任", "决策", "领导"],
-    reflection: ["我愿意承担哪部分责任？", "我是否在用控制来对抗不安？"],
-    actions: ["做一个明确决策并公布规则", "为长期目标配置资源（时间/钱/人）"],
+  4: {
+    label: "结构",
+    keywords: ["秩序", "稳定", "边界"],
+    upright: "建立规则和节奏，会让这件事从情绪波动里稳定下来。",
+    reversed: "结构过紧或过松都在消耗你，需要重新设置边界。",
+    reflection: ["哪里需要更清楚的规则？", "我把安全感交给了什么？"],
+    actions: ["设定一个可执行的时间块。", "删掉一个不必要的承诺。"],
+  },
+  5: {
+    label: "冲突",
+    keywords: ["变化", "摩擦", "挑战"],
+    upright: "冲突暴露了真实问题，它不舒服，但能推动你调整策略。",
+    reversed: "你可能在逃避必要的碰撞，或把所有阻力都看成失败。",
+    reflection: ["这次摩擦真正提醒了我什么？", "我能接受哪种不完美？"],
+    actions: ["把冲突拆成可处理的具体问题。", "先解决影响最大的一个点。"],
+  },
+  6: {
+    label: "调和",
+    keywords: ["关系", "修复", "互惠"],
+    upright: "关系或局面有修复空间，关键是让给予和接受重新平衡。",
+    reversed: "你可能承担太多，或期待别人自动理解你的需要。",
+    reflection: ["我在这段关系里给了什么、收到了什么？", "我需要怎样被回应？"],
+    actions: ["说出一个具体需要。", "为自己保留一段恢复时间。"],
+  },
+  7: {
+    label: "试炼",
+    keywords: ["坚持", "辨别", "防守"],
+    upright: "现在需要坚持核心立场，同时辨别哪些战斗值得投入。",
+    reversed: "你可能因为疲惫而防御过度，或把所有声音都当成威胁。",
+    reflection: ["我真正要守住的是什么？", "哪些压力其实可以放下？"],
+    actions: ["写下前三个优先级。", "拒绝一个不必要的消耗。"],
+  },
+  8: {
+    label: "推进",
+    keywords: ["练习", "速度", "掌握"],
+    upright: "持续练习会带来突破，适合把注意力放在手艺和节奏上。",
+    reversed: "忙碌不等于推进，你可能在重复低效动作。",
+    reflection: ["我在哪个环节需要练习而不是焦虑？", "哪些动作只是在假装努力？"],
+    actions: ["设定一个三天的小练习。", "停止一个低产出的重复动作。"],
+  },
+  9: {
+    label: "成熟",
+    keywords: ["收获", "独处", "整合"],
+    upright: "你已经积累了经验，现在适合整合成果，也承认自己的成长。",
+    reversed: "你可能看不见已拥有的东西，或把独立误解成孤立。",
+    reflection: ["这段经历让我变得更清楚的是什么？", "我已经拥有了哪些资源？"],
+    actions: ["记录三个已完成的进展。", "为自己安排一次独处复盘。"],
+  },
+  10: {
+    label: "完成",
+    keywords: ["结果", "循环", "转折"],
+    upright: "一个阶段正在收束，适合看见结果，并准备进入新的循环。",
+    reversed: "旧循环还没有真正结束，可能因为你还在重复熟悉的模式。",
+    reflection: ["这件事的阶段性结论是什么？", "我不想再重复哪个模式？"],
+    actions: ["给当前阶段写一句总结。", "决定下一阶段只保留一件事。"],
   },
 };
 
-function suitLabel(suit: TarotSuit): string {
-  return SUIT_INFO[suit].zh;
+const COURTS = {
+  Page: {
+    zh: "侍从",
+    label: "学习者",
+    keywords: ["好奇", "尝试", "消息"],
+    upright: "用初学者心态靠近问题，允许自己边做边学。",
+    reversed: "想得很多但经验不足，容易因为怕幼稚而不敢开始。",
+    reflection: ["我可以向谁学习？", "我愿意承认自己还在学习吗？"],
+    actions: ["提出一个具体问题。", "做一次低风险尝试。"],
+  },
+  Knight: {
+    zh: "骑士",
+    label: "行动者",
+    keywords: ["推进", "追求", "动力"],
+    upright: "行动力正在聚集，适合带着明确方向推进。",
+    reversed: "速度可能盖过判断，先确认你不是在用行动逃避感受。",
+    reflection: ["我急着冲向哪里？", "我的动力来自热爱还是焦虑？"],
+    actions: ["给行动设置一个停止点。", "先确认目标再加速。"],
+  },
+  Queen: {
+    zh: "王后",
+    label: "照看者",
+    keywords: ["接纳", "滋养", "成熟"],
+    upright: "成熟的力量来自照看真实需要，而不是压抑自己。",
+    reversed: "你可能照顾了别人，却忽略自己的边界和恢复。",
+    reflection: ["我正在滋养什么？", "我是否把照顾变成了控制？"],
+    actions: ["为自己安排一件恢复性的事。", "温和但明确地表达边界。"],
+  },
+  King: {
+    zh: "国王",
+    label: "掌舵者",
+    keywords: ["领导", "承担", "决策"],
+    upright: "你需要站到主导位置，用稳定的判断承担决定。",
+    reversed: "控制感可能变成僵硬，真正的掌控包括听见反馈。",
+    reflection: ["我愿意为哪个决定负责？", "我是否把控制误认为安全？"],
+    actions: ["写下一条清晰决策。", "邀请一个反对意见来校准判断。"],
+  },
+} as const;
+
+function suitInfo(suit: TarotSuit) {
+  return SUITS[suit];
 }
 
-function suitElement(suit: TarotSuit): TarotElement {
-  return SUIT_INFO[suit].element;
-}
-
-function suitKeywords(suit: TarotSuit): string[] {
-  return SUIT_INFO[suit].themes;
-}
-
-function mergeKeywords(a: string[], b: string[]): string[] {
-  const out: string[] = [];
-  for (const x of [...a, ...b]) {
-    if (!out.includes(x)) out.push(x);
-  }
-  return out.slice(0, 6);
-}
-
-function buildMinorCardText(meta: {
-  stage: string;
-  suit: TarotSuit;
-  rank: string;
-  light: string;
-  shadow: string;
-}): { upright: string; reversed: string } {
-  const suit = SUIT_INFO[meta.suit];
-  const header = `${suitLabel(meta.suit)}的主题：${suit.themes.join("、")}。阶段：${meta.stage}。`;
-  const upright = `${header}${meta.light}（倾向：${suit.light}）`;
-  const reversed = `${header}${meta.shadow}（提醒：${suit.shadow}）`;
-  return { upright, reversed };
+function mergeKeywords(...groups: ReadonlyArray<ReadonlyArray<string>>): string[] {
+  return Array.from(new Set(groups.flat())).slice(0, 6);
 }
 
 export function createMinorArcana(): TarotCard[] {
@@ -219,67 +185,49 @@ export function createMinorArcana(): TarotCard[] {
   const suits: TarotSuit[] = ["wands", "cups", "swords", "pentacles"];
 
   for (const suit of suits) {
-    // Ace..10
+    const info = suitInfo(suit);
+
     for (let num = 1; num <= 10; num++) {
-      const meta = NUMBER_META[num];
+      const meta = NUMBER_STAGES[num];
       const rank = num === 1 ? "Ace" : String(num);
-      const { upright, reversed } = buildMinorCardText({
-        stage: meta.stage,
-        suit,
-        rank,
-        light: meta.light,
-        shadow: meta.shadow,
-      });
-      const name = `${suitLabel(suit)}${rank === "Ace" ? "A" : rank}`;
       cards.push({
         id: `minor-${suit}-${rank.toLowerCase()}`,
-        name,
+        name: `${info.zh}${rank === "Ace" ? "首牌" : rank}`,
         arcana: "minor",
         suit,
         rank,
-        keywords: mergeKeywords(meta.keywords, suitKeywords(suit)),
-        upright,
-        reversed,
-        element: suitElement(suit),
-        archetype: meta.stage,
-        light: meta.light,
-        shadow: meta.shadow,
-        reflectionQuestions: meta.reflection.slice(0, 2),
-        actionAdvice: meta.actions.slice(0, 2),
+        keywords: mergeKeywords(meta.keywords, info.themes),
+        upright: `${info.zh}关注${info.themes.join("、")}。${meta.upright}${info.light}`,
+        reversed: `${info.zh}关注${info.themes.join("、")}。${meta.reversed}${info.shadow}`,
+        element: info.element,
+        archetype: `${info.zh}的${meta.label}`,
+        light: meta.upright,
+        shadow: meta.reversed,
+        reflectionQuestions: [...meta.reflection],
+        actionAdvice: [...meta.actions],
       });
     }
 
-    // Courts
-    const courts: Array<keyof typeof COURT_META> = ["Page", "Knight", "Queen", "King"];
-    for (const court of courts) {
-      const meta = COURT_META[court];
-      const { upright, reversed } = buildMinorCardText({
-        stage: meta.stage,
-        suit,
-        rank: court,
-        light: meta.light,
-        shadow: meta.shadow,
-      });
-      const name = `${suitLabel(suit)}${court}`;
+    for (const court of ["Page", "Knight", "Queen", "King"] as const) {
+      const meta = COURTS[court];
       cards.push({
         id: `minor-${suit}-${court.toLowerCase()}`,
-        name,
+        name: `${info.zh}${meta.zh}`,
         arcana: "minor",
         suit,
         rank: court,
-        keywords: mergeKeywords(meta.keywords, suitKeywords(suit)),
-        upright,
-        reversed,
-        element: suitElement(suit),
-        archetype: meta.stage,
-        light: meta.light,
-        shadow: meta.shadow,
-        reflectionQuestions: meta.reflection.slice(0, 2),
-        actionAdvice: meta.actions.slice(0, 2),
+        keywords: mergeKeywords(meta.keywords, info.themes),
+        upright: `${info.zh}${meta.zh}提醒你：${meta.upright}${info.light}`,
+        reversed: `${info.zh}${meta.zh}提醒你：${meta.reversed}${info.shadow}`,
+        element: info.element,
+        archetype: `${info.zh}的${meta.label}`,
+        light: meta.upright,
+        shadow: meta.reversed,
+        reflectionQuestions: [...meta.reflection],
+        actionAdvice: [...meta.actions],
       });
     }
   }
 
   return cards;
 }
-

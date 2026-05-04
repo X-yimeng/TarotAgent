@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "塔罗占卜",
-  description: "输入问题，抽牌解读，并生成可分享的链接。",
+  title: "塔罗洞察 Agent",
+  description: "用塔罗牌、反思问题和行动建议整理当下困惑。",
 };
 
 export default function RootLayout({
