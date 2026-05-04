@@ -181,6 +181,7 @@ function TarotCardImage({ card }: { card: DrawnCard }) {
         fill
         sizes="(max-width: 768px) 45vw, 190px"
         loading="lazy"
+        unoptimized
         className={`object-contain p-2 ${card.reversed ? "rotate-180" : ""}`}
       />
     </div>
